@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="assets/devpath-banner.png" alt="DevPath Banner" width="100%" />
+<img src="assets/devpath_banner.png" alt="DevPath Banner" width="100%" />
 
 <br/>
 
