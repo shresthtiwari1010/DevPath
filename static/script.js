@@ -567,46 +567,50 @@ if (clearFiltersBtn) {
 
   //takes the array of projects from the api and draws them on the page as cards
   //if array is empty it shows the "no results" message instead
-  function renderResults(projects, message) {
-    resultsSection.style.display = "block";
-    resultsLoadingEl.style.display = "none";
-    // Clear out any cards from a previous search before showing new ones
-    resultsGrid.innerHTML = "";
+function renderResults(projects, message) {
+  resultsSection.style.display = "block";
+  resultsLoadingEl.style.display = "none";
 
-    if (!projects || projects.length === 0) {
-      resultsGrid.style.display     = "none";
-      resultsEmptyEl.style.display  = "block";
-      resultsGrid.style.display = "none";
-      resultsEmptyEl.style.display = "block";
-      if (message && emptyMessageEl) emptyMessageEl.textContent = message;
-    if (!projects || projects.length === 0) { //if no projects returned from api, show the "no results" message and hide the grid
-      resultsGrid.style.display    = "none";
-      resultsEmptyEl.style.display = "block";
+  // Clear out previous results before rendering new ones
+  resultsGrid.innerHTML = "";
 
-      // Show a friendly custom message when the user selected an interest
-      var selectedInterest = document.getElementById("interest")?.value;
-      if (selectedInterest) {
-        emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
-      } else if (message) {
-        emptyMessageEl.textContent = message;
-      } else {
-        emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
-      }
+  // If no projects are returned, show the empty state message
+  if (!projects || projects.length === 0) {
+    resultsGrid.style.display = "none";
+    resultsEmptyEl.style.display = "block";
 
-      resultsSection.scrollIntoView({ behavior: "smooth" });
-      return;
+    // Show a custom message when an interest is selected
+    var interestSelect = document.getElementById("interest");
+    var selectedInterest = "";
+
+    if (interestSelect) {
+      selectedInterest = interestSelect.value;
     }
 
-    resultsEmptyEl.style.display = "none";
-    resultsGrid.style.display = "grid";
-
-    //build a card for each project and add it to the grid
-    projects.forEach(function (project) {
-      resultsGrid.appendChild(buildProjectCard(project));
-    });
+    if (selectedInterest) {
+      emptyMessageEl.textContent =
+        "No projects are currently available for this interest. Please check back later or try a different area.";
+    } else if (message) {
+      emptyMessageEl.textContent = message;
+    } else {
+      emptyMessageEl.textContent =
+        "Try adjusting your skills or choosing a different interest area.";
+    }
 
     resultsSection.scrollIntoView({ behavior: "smooth" });
+    return;
   }
+
+  resultsEmptyEl.style.display = "none";
+  resultsGrid.style.display = "grid";
+
+  // Build a card for each project and add it to the grid
+  projects.forEach(function (project) {
+    resultsGrid.appendChild(buildProjectCard(project));
+  });
+
+  resultsSection.scrollIntoView({ behavior: "smooth" });
+}
 
   // builds one project card as a DOM element and returns it
   // the card has title, short description, tags and link
