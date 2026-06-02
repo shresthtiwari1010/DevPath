@@ -1,3 +1,38 @@
+"""
+vault.py
+===============
+Project:    Secure Crypto Vault
+Difficulty: Advanced
+Category:   Cybersecurity & Cryptography
+Skills:     Python, cryptography (AES-GCM), PBKDF2HMAC, JSON, getpass
+Time:       Medium (a weekend)
+
+What you will build:
+    A high-security CLI vault to store service credentials (usernames/passwords). 
+    It uses AES-256-GCM for encryption, PBKDF2 for key derivation to protect 
+    against brute-force attacks, and stores data in an encrypted JSON format.
+
+How to run:
+    pip install cryptography
+    python vault.py
+
+Learning goals:
+    - Implementing industry-standard AES-GCM encryption
+    - Securing passwords using Key Derivation Functions (KDF)
+    - Handling sensitive binary data as Hexadecimal strings in JSON
+    - Managing session-based authentication without storing plain-text passwords
+
+Roadmap:
+    Step 1:  Install 'cryptography' and run the skeleton to verify the menu
+    Step 2:  Complete derive_key() using PBKDF2HMAC with 600,000 iterations
+    Step 3:  Implement vault setup: generate a salt and the initial 'test_lock'
+    Step 4:  Implement vault login: verify the Master Password against the lock
+    Step 5:  Complete 'Add Password': encrypt credentials with a unique nonce
+    Step 6:  Complete 'Get Password': decrypt and split stored service data
+    Step 7:  Implement the Audit feature to view raw encrypted Hex strings
+    Step 8:  Test security by attempting to view vault.json contents manually
+"""
+        
 import json
 import os
 import secrets
@@ -262,3 +297,28 @@ def main():
 if __name__ == "__main__":
     # This checks if the script is being run directly rather than imported
     main()
+
+# ---------------------------------------------------------------------------
+# Sample Validation Flow (Manual Test Cases)
+# ---------------------------------------------------------------------------
+"""
+1. Initialization: Run script -> Create a Master Password.
+   Verify 'vault.json' is created and contains 'salt' and 'test_lock'.
+
+2. Login Logic: Close script -> Run again -> Enter WRONG password.
+   Verify 'ACCESS DENIED' message triggers and script terminates.
+
+3. Encryption Logic: Select '1' -> '1' (Add Password) -> Enter 'GitHub', 
+   'my_user', and 'p@ssword123'. 
+   Verify console shows '[SAVED]'.
+
+4. Search/Decryption: Select '2' (Get Password) -> Enter 'github'.
+   Verify 'my_user' and 'p@ssword123' are displayed in plain text.
+
+5. Audit/Persistence: Select '5' (Audit Metadata) -> Enter 'github'.
+   Verify that only the Hexadecimal 'Ciphertext' and 'Nonce' are displayed.
+   Open 'vault.json' in a text editor to confirm NO plain text exists.
+
+6. Deletion: Select '4' (Delete Entry) -> Enter 'github' -> Confirm 'y'.
+   Verify service no longer appears in 'Registered Services' list.
+"""
