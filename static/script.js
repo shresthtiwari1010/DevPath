@@ -67,7 +67,7 @@
     html.dataset.theme = theme;
 
     // 2. Persist the user's choice across sessions
-    try { localStorage.setItem("devpath-theme", theme); } catch (e) { /* private browsing may block */ }
+    try { localStorage.setItem("theme", theme); } catch (e) { /* private browsing may block */ }
 
     // 3. Update every toggle button's accessible state
     document.querySelectorAll(".theme-toggle").forEach(function (btn) {
@@ -193,7 +193,7 @@ var errorMsg = document.getElementById('github-modal-error');
 // ============================================================
 (function initMobileNav() {
   var toggle = document.getElementById("nav-mobile-toggle"); //hamburger button
-  var menu = document.getElementById("nav-mobile-menu"); //dropdown menu 
+  var menu   = document.getElementById("nav-mobile-menu"); //dropdown menu
 
   // Nothing to do if the nav isn't on this page, just bail out
   if (!toggle || !menu) return;
@@ -217,6 +217,14 @@ var errorMsg = document.getElementById('github-modal-error');
       toggle.setAttribute("aria-expanded", "false");
     });
   });
+
+  window.addEventListener("resize", function () {
+    if (window.innerWidth >= 640) {
+      menu.classList.remove("open");
+      toggle.classList.remove("open");
+      toggle.setAttribute("aria-expanded", "false");
+    }
+  });
 })();
 
 
@@ -227,19 +235,19 @@ if (isIndexPage) {
 
   // DOM references
   // grabbing all the elements we'll need so we're not calling getElementById over and over again throughout the code
-  var form = document.getElementById("recommend-form");
-  var submitBtn = document.getElementById("submit-btn");
-  var btnLabel = document.getElementById("btn-label"); // "get recommendations" text 
-  var btnLoading = document.getElementById("btn-loading"); // spinner icon inside the button 
-  var resultsSection = document.getElementById("results-section");
-  var resultsGrid = document.getElementById("results-grid");
-  var resultsLoadingEl = document.getElementById("results-loading"); // "Loading..." text in the results 
-  var resultsEmptyEl = document.getElementById("results-empty");
-  var emptyMessageEl = document.getElementById("empty-message");
-  var skillsHidden = document.getElementById("skills"); // the hidden input that holds skills list
-  var skillsTextInput = document.getElementById("skills-input"); //visible text box in which user types skills
-  var chipsSelectedEl = document.getElementById("skill-chips-selected"); //selected skills tags container
-  var quickPickChips = document.querySelectorAll(".skill-chip"); // predefined skills user can click
+  var form              = document.getElementById("recommend-form");
+  var submitBtn         = document.getElementById("submit-btn");
+  var btnLabel          = document.getElementById("btn-label"); // "get recommendations" text
+  var btnLoading        = document.getElementById("btn-loading"); // spinner icon inside the button
+  var resultsSection    = document.getElementById("results-section");
+  var resultsGrid       = document.getElementById("results-grid");
+  var resultsLoadingEl  = document.getElementById("results-loading"); // "Loading..." text in the results
+  var resultsEmptyEl    = document.getElementById("results-empty");
+  var emptyMessageEl    = document.getElementById("empty-message");
+  var skillsHidden      = document.getElementById("skills"); // the hidden input that holds skills list
+  var skillsTextInput   = document.getElementById("skills-input"); //visible text box in which user types skills
+  var chipsSelectedEl   = document.getElementById("skill-chips-selected"); //selected skills tags container
+  var quickPickChips    = document.querySelectorAll(".skill-chip"); // predefined skills user can click
 
   // Tracks currently selected skills to prevent duplicates
   var selectedSkills = [];
@@ -683,62 +691,69 @@ if (isIndexPage) {
   // ----------------------------------------------------------
 
   form.addEventListener("submit", function (evt) {
-    evt.preventDefault(); //stop the browser from reloading the page on form submit
-    clearAllErrors()
+  evt.preventDefault();
 
-    if (skillsTextInput.value.trim()) {
-      addSkill(skillsTextInput.value);
-      skillsTextInput.value = "";
-      hideSuggestions();
-    }
+  clearAllErrors();
 
-    if (!validateForm()) return; //stop - anything missing/invalid
+  if (skillsTextInput.value.trim()) {
+    addSkill(skillsTextInput.value);
+    skillsTextInput.value = "";
+    hideSuggestions();
+  }
 
-    setLoadingState(true);
+  if (!validateForm()) return;
 
-    // Allow browser to paint spinner before request starts
-    requestAnimationFrame(function () {
+  setLoadingState(true);
 
-      var payload = {
-        skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
-        level: document.getElementById("level").value,
-        interest: document.getElementById("interest").value,
-        time: document.getElementById("time").value
-      };
+  requestAnimationFrame(function () {
 
-      fetch("/api/recommend", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
+    var payload = {
+      skills: skillsHidden.value.trim() || skillsTextInput.value.trim(),
+      level: document.getElementById("level").value,
+      interest: document.getElementById("interest").value,
+      time: document.getElementById("time").value
+    };
+
+    fetch("/api/recommend", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    })
+      .then(function (res) {
+        return res.json();
       })
-        .then(function (res) {
-          return res.json();
-        })
-        .then(function (data) {
+      .then(function (data) {
 
-          setLoadingState(false);
+        setLoadingState(false);
 
-          if (data.error) {
-            var generalErr = document.getElementById("form-error-general");
-
-            if (generalErr) {
-              generalErr.textContent = data.error;
-            }
-
-            return;
-          }
-
-          renderResults(data.projects || [], data.message);
-        })
-        .catch(function () {
-          setLoadingState(false);
+        if (data.error) {
           var generalErr = document.getElementById("form-error-general");
           if (generalErr) {
-            generalErr.textContent = "An error occurred. Please try again.";
+            generalErr.textContent = data.error;
           }
-        });
-    });
+
+          return;
+        }
+
+        renderResults(data.projects || [], data.message);
+      })
+      .catch(function (err) {
+
+        setLoadingState(false);
+
+        var generalErr = document.getElementById("form-error-general");
+
+        if (generalErr) {
+          generalErr.textContent =
+            "Something went wrong. Please try again.";
+        }
+
+        console.error("API request failed:", err);
+      });
   });
+});
 
   // Manages the loading state of the form and results section(whats visible or not)
   function setLoadingState(isLoading) {
@@ -767,6 +782,18 @@ if (isIndexPage) {
   // Render result cards
   // ----------------------------------------------------------
 
+  function truncate(text, maxLength) {
+    if (!text) return "";
+    return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
+  }
+
+  function createTag(text, type) {
+    var span = document.createElement("span");
+    span.className = "project-tag project-tag--" + type;
+    span.textContent = text;
+    return span;
+  }
+
   //takes the array of projects from the api and draws them on the page as cards
   //if array is empty it shows the "no results" message instead
   function renderResults(projects, message) {
@@ -775,156 +802,121 @@ if (isIndexPage) {
     // Clear out any cards from a previous search before showing new ones
     resultsGrid.innerHTML = "";
 
-    if (!projects || projects.length === 0) { //if no projects returned from api, show the "no results" message and hide the grid
-        resultsGrid.style.display = "none";
-        resultsEmptyEl.style.display = "block";
+    if (!projects || projects.length === 0) {
+      resultsGrid.style.display = "none";
+      resultsEmptyEl.style.display = "block";
 
-        // Show a friendly custom message when the user selected an interest
-        var selectedInterest = document.getElementById("interest")?.value;
-        if (selectedInterest) {
-          emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
-        } else if (message) {
-          emptyMessageEl.textContent = message;
-        } else {
-          emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
-        }
-
-        resultsSection.scrollIntoView({ behavior: "smooth" });
-        return;
+      // Show a friendly custom message when the user selected an interest
+      var selectedInterest = document.getElementById("interest")?.value;
+      if (selectedInterest) {
+        emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
+      } else if (message) {
+        emptyMessageEl.textContent = message;
+      } else {
+        emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
       }
 
-      resultsEmptyEl.style.display = "none";
-      resultsGrid.style.display = "grid";
+  // Clear out previous results before rendering new ones
+  resultsGrid.innerHTML = "";
 
-      //build a card for each project and add it to the grid
-      projects.forEach(function (project) {
-        resultsGrid.appendChild(buildProjectCard(project));
-      });
+  // If no projects are returned, show the empty state message
+  if (!projects || projects.length === 0) {
+    resultsGrid.style.display = "none";
+    resultsEmptyEl.style.display = "block";
 
-      resultsSection.scrollIntoView({ behavior: "smooth" });
-    }
+    projects.forEach(function (project) {
+      resultsGrid.appendChild(buildProjectCard(project));
+    });
 
-    // builds one project card as a DOM element and returns it
-    // the card has title, short description, tags and link
-    function buildProjectCard(project) {
-      var card = document.createElement("div");
-      card.className = "project-card";
+    resultsSection.scrollIntoView({ behavior: "smooth" });
+    return;
+  }
 
-      // Title
-      var title = document.createElement("h3");
-      title.className = "project-card-title";
-      title.textContent = project.title;
-
-      // Description (truncated for visual consistency)
-      var desc = document.createElement("p");
-      desc.className = "project-card-desc";
-      // Cut description to 120 chars so all cards stay the same height
-      desc.textContent = truncate(project.description, 120);
-
-      // Tags row
-      var tagsRow = document.createElement("div");
-      tagsRow.className = "project-card-tags";
-
-      // Show all project skills as tags so users can see the full match
-      (project.skills || []).forEach(function (skill) {
-        tagsRow.appendChild(createTag(skill, "skill"));
-      });
-
-      // Level tag (colour-coded via CSS class)
-      // Lowercase so it matches the CSS class names like "level beginner", "level advanced"
-      var levelClass = "level " + (project.level || "").toLowerCase();
-      tagsRow.appendChild(createTag(project.level, levelClass));
-
-      // Time tag
-      tagsRow.appendChild(createTag("Time: " + project.time, "time"));
-
-  // builds one project card as a DOM element and returns it
-  // the card has title, short description, tags and link
   function buildProjectCard(project) {
     var card = document.createElement("div");
     card.className = "project-card";
 
-    // Title
     var title = document.createElement("h3");
     title.className = "project-card-title";
     title.textContent = project.title;
 
-    // Description wrapper — keeps text and button as separate child elements
-    // so we never use textContent (which would wipe out child nodes like the button)
     var desc = document.createElement("p");
     desc.className = "project-card-desc";
-
-    // Separate span for the description text so we can update it
-    // without touching the toggle button
     var descText = document.createElement("span");
     descText.className = "project-card-desc-text";
-
     var shortText = truncate(project.description, 120);
-    var fullText  = project.description;
+    var fullText = project.description;
     var isExpanded = false;
-
     descText.textContent = shortText;
     desc.appendChild(descText);
 
-    // Only add Read More button if description is actually truncated
-    if (fullText.length > 120) {
+    if (fullText && fullText.length > 120) {
       var readMoreBtn = document.createElement("button");
       readMoreBtn.className = "read-more-btn";
       readMoreBtn.textContent = "Read more";
-      // aria-expanded tells screen readers whether the content is expanded or not
       readMoreBtn.setAttribute("aria-expanded", "false");
-
       readMoreBtn.addEventListener("click", function () {
         isExpanded = !isExpanded;
-        // Update only the text span — button stays in the DOM untouched
         descText.textContent = isExpanded ? fullText : shortText;
         readMoreBtn.textContent = isExpanded ? "Read less" : "Read more";
         readMoreBtn.setAttribute("aria-expanded", isExpanded ? "true" : "false");
       });
-
       desc.appendChild(readMoreBtn);
     }
 
-    // Tags row
     var tagsRow = document.createElement("div");
     tagsRow.className = "project-card-tags";
-
     (project.skills || []).forEach(function (skill) {
       tagsRow.appendChild(createTag(skill, "skill"));
     });
-
-    var levelClass = "level " + (project.level || "").toLowerCase();
-    tagsRow.appendChild(createTag(project.level, levelClass));
+    tagsRow.appendChild(createTag(project.level, (project.level || "").toLowerCase()));
     tagsRow.appendChild(createTag("Time: " + project.time, "time"));
 
-      // Assemble the card in order
-      card.appendChild(title);
-      card.appendChild(desc);
-      card.appendChild(tagsRow);
-      card.appendChild(footer);
-
+    var footer = document.createElement("div");
+    footer.className = "project-card-footer";
     var link = document.createElement("a");
     link.className = "btn-details";
     link.textContent = "View Full Project";
     link.href = "/project/" + project.id;
+    footer.appendChild(link);
 
-    // helper to create a coloured tag element (used for skills, level, time tags on the cards)
-    function createTag(text, type) {
-      var span = document.createElement("span");
-      // The type becomes a BEM modifier so CSS can style each tag differently
-      span.className = "project-tag project-tag--" + type;
-      span.textContent = text;
-      return span;
+    card.appendChild(title);
+    card.appendChild(desc);
+    card.appendChild(tagsRow);
+    card.appendChild(footer);
+    return card;
+  }
+
+  //takes the array of projects from the api and draws them on the page as cards
+  function renderResults(projects, message) {
+    resultsSection.style.display = "block";
+    resultsLoadingEl.style.display = "none";
+    resultsGrid.innerHTML = "";
+
+    if (!projects || projects.length === 0) {
+      resultsGrid.style.display = "none";
+      resultsEmptyEl.style.display = "block";
+      var selectedInterest = document.getElementById("interest") && document.getElementById("interest").value;
+      if (selectedInterest) {
+        emptyMessageEl.textContent = "No projects are currently available for this interest. Please check back later or try a different area.";
+      } else if (message) {
+        emptyMessageEl.textContent = message;
+      } else {
+        emptyMessageEl.textContent = "Try adjusting your skills or choosing a different interest area.";
+      }
+      resultsSection.scrollIntoView({ behavior: "smooth" });
+      return;
     }
 
-    function truncate(text, maxLength) {
-      // Safety check — just return empty string if text is missing
-      if (!text) return "";
-      // Only add "..." if the text is actually longer than the limit
-      return text.length > maxLength ? text.slice(0, maxLength) + "..." : text;
-    }
+    resultsEmptyEl.style.display = "none";
+    resultsGrid.style.display = "grid";
+    projects.forEach(function (project) {
+      resultsGrid.appendChild(buildProjectCard(project));
+    });
+    resultsSection.scrollIntoView({ behavior: "smooth" });
+  }
 
-  } // end isIndexPage
+} // end isIndexPage
 
 
   // ============================================================
@@ -965,6 +957,30 @@ if (isIndexPage) {
       document.body.style.overflow = "";
     }
 
+    // Render code string as a list of DOM rows where each row contains a
+    // line-number gutter cell and a code cell. Returning DOM nodes instead
+    // of an HTML string avoids innerHTML XSS risks from the code content.
+    function renderCodeWithLineNumbers(code) {
+      var lines = (code || "").split("\n");
+      return lines.map(function (line, index) {
+        var row = document.createElement("div");
+        row.className = "code-line";
+
+        var lineNum = document.createElement("span");
+        lineNum.className = "code-line-number";
+        lineNum.setAttribute("aria-hidden", "true");
+        lineNum.textContent = index + 1;
+
+        var lineCode = document.createElement("span");
+        lineCode.className = "code-line-content";
+        lineCode.textContent = line;
+
+        row.appendChild(lineNum);
+        row.appendChild(lineCode);
+        return row;
+      });
+    }
+
     //fetches the starter code from the server via an API call
     //inserts the code into the panel and handles loading/error states
     function fetchStarterCode() {
@@ -994,6 +1010,178 @@ if (isIndexPage) {
           }
         });
     }
+
+   // ============================================================
+// ROADMAP PROGRESS TRACKER
+// ============================================================
+
+
+var roadmapCheckboxes = document.querySelectorAll(
+    ".roadmap-checkbox"
+);
+
+var progressFill = document.getElementById(
+    "roadmap-progress-fill"
+);
+
+var progressText = document.getElementById(
+    "roadmap-progress-text"
+);
+
+var progressBar = document.querySelector(
+    ".roadmap-progress-bar"
+);
+
+// Local storage key
+var roadmapStorageKey =
+    `devpath-roadmap-progress-${PROJECT_ID}`;
+
+
+// ------------------------------------------------------------
+// Restore saved roadmap state
+// ------------------------------------------------------------
+
+var savedRoadmapState =
+    localStorage.getItem(
+        roadmapStorageKey
+    );
+
+if(savedRoadmapState){
+
+    try{
+
+        var parsedState =
+            JSON.parse(savedRoadmapState);
+
+        roadmapCheckboxes.forEach(
+            function(cb,index){
+
+                cb.checked =
+                    !!parsedState[index];
+
+            }
+        );
+
+    } catch(error){
+
+        console.error(
+            "Failed to restore roadmap progress",
+            error
+        );
+
+    }
+}
+
+
+// ------------------------------------------------------------
+// Update roadmap progress
+// ------------------------------------------------------------
+
+function updateRoadmapProgress(){
+
+    if(!roadmapCheckboxes.length){
+        return;
+    }
+
+    var completed = 0;
+
+    roadmapCheckboxes.forEach(function(cb){
+
+        var step = cb.closest(
+            ".roadmap-step"
+        );
+
+        if(cb.checked){
+
+            completed++;
+
+            if(step){
+                step.classList.add(
+                    "completed"
+                );
+            }
+
+        } else {
+
+            if(step){
+                step.classList.remove(
+                    "completed"
+                );
+            }
+
+        }
+
+    });
+
+    var percent = Math.round(
+        (completed / roadmapCheckboxes.length)
+        * 100
+    );
+
+    // Update progress bar fill
+    if(progressFill){
+
+        progressFill.style.width =
+            percent + "%";
+
+    }
+
+    // Update progress text
+    if(progressText){
+
+        progressText.textContent =
+            percent + "% completed";
+
+    }
+
+    // Accessibility update
+    if(progressBar){
+
+        progressBar.setAttribute(
+            "aria-valuenow",
+            percent
+        );
+
+    }
+
+    // Save checkbox state
+    var savedState = [];
+
+    roadmapCheckboxes.forEach(function(cb){
+
+        savedState.push(
+            cb.checked
+        );
+
+    });
+
+    localStorage.setItem(
+        roadmapStorageKey,
+        JSON.stringify(savedState)
+    );
+
+}
+
+
+// ------------------------------------------------------------
+// Attach checkbox listeners
+// ------------------------------------------------------------
+
+roadmapCheckboxes.forEach(function(cb){
+
+    cb.addEventListener(
+        "change",
+        updateRoadmapProgress
+    );
+
+});
+
+
+// ------------------------------------------------------------
+// Initial progress render
+// ------------------------------------------------------------
+
+updateRoadmapProgress();
 
     // Attach open/close handlers
     if (btnViewCode) btnViewCode.addEventListener("click", openCodePanel);
@@ -1119,14 +1307,31 @@ if (isIndexPage) {
     // 3. Fetch Skills Logic
     fetchBtn.addEventListener('click', async () => {
       const username = githubInput.value.trim();
-      if (!username) return;
+
+      // Clear any previous error before validating / retrying
+      errorMsg.textContent = '';
+
+      if (!username) {
+        errorMsg.textContent = "Please enter a GitHub username";
+        githubInput.focus();
+        return;
+      }
 
       fetchBtn.disabled = true;
       fetchBtn.textContent = 'Syncing...';
 
       try {
         const response = await fetch(`https://api.github.com/users/${username}/repos`);
-        if (!response.ok) throw new Error();
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            throw new Error("Username not found. Please check and try again.");
+          }
+          if (response.status === 403) {
+            throw new Error("GitHub rate limit reached. Please try again later.");
+          }
+          throw new Error("Failed to fetch skills. Please try again.");
+        }
 
         const repos = await response.json();
         const langs = [...new Set(repos.map(r => r.language).filter(Boolean))];
@@ -1140,7 +1345,7 @@ if (isIndexPage) {
           errorMsg.textContent = "No public languages found.";
         }
       } catch (err) {
-        errorMsg.textContent = err.message ?? "Failed to fetch skills";
+        errorMsg.textContent = err.message || "Failed to fetch skills";
       } finally {
         fetchBtn.disabled = false;
         fetchBtn.textContent = 'Fetch Skills';
@@ -1148,46 +1353,53 @@ if (isIndexPage) {
     });
   } // end github modal handlers
 
-    /* ---- Scroll-to-top button ---- */
 
-    /* Show the button only when the user has scrolled more than 300px */
-    var SCROLL_THRESHOLD = 300;
+// ============================================================
+// SCROLL NAVIGATION BUTTON (runs on all pages)
+// ============================================================
+(function () {
+  var SCROLL_THRESHOLD = 200;
+  var scrollTopBtn = document.getElementById('scroll-top-btn');
+  var scrollBtnIcon = document.getElementById('scroll-btn-icon');
+  var atBottom = false;
 
-    /* Get the button element; guard against pages that do not have it */
-    var scrollTopBtn = document.getElementById('scroll-top-btn');
+  var ARROW_UP   = '<polyline points="18 15 12 9 6 15"/>';
+  var ARROW_DOWN = '<polyline points="6 9 12 15 18 9"/>';
 
-    /* Add or remove the .visible class based on scroll position */
-    function handleScroll() {
-      if (!scrollTopBtn) return;
-      if (window.pageYOffset > SCROLL_THRESHOLD) {
-        scrollTopBtn.classList.add('visible');
+  function isNearBottom() {
+    return (window.innerHeight + window.pageYOffset) >= document.body.scrollHeight - 40;
+  }
+
+  function handleScroll() {
+    if (!scrollTopBtn) return;
+    if (window.pageYOffset > SCROLL_THRESHOLD) {
+      scrollTopBtn.classList.add('visible');
+    } else {
+      scrollTopBtn.classList.remove('visible');
+    }
+    if (isNearBottom()) {
+      atBottom = true;
+      scrollTopBtn.setAttribute('aria-label', 'Scroll to top');
+      scrollTopBtn.title = 'Scroll to top';
+      if (scrollBtnIcon) scrollBtnIcon.innerHTML = ARROW_UP;
+    } else {
+      atBottom = false;
+      scrollTopBtn.setAttribute('aria-label', 'Scroll to bottom');
+      scrollTopBtn.title = 'Scroll to bottom';
+      if (scrollBtnIcon) scrollBtnIcon.innerHTML = ARROW_DOWN;
+    }
+  }
+
+  if (scrollTopBtn) {
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    scrollTopBtn.addEventListener('click', function () {
+      if (atBottom) {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       } else {
-        scrollTopBtn.classList.remove('visible');
+        window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' });
       }
-    }
-
-    /* Smooth-scroll to the very top of the page */
-    function scrollToTop() {
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-
-/* Add or remove the .visible class based on scroll position */
-function handleScroll() {
-  if (!scrollTopBtn) return;
-  if (window.pageYOffset > SCROLL_THRESHOLD) {
-    scrollTopBtn.classList.add('visible');
-  } else {
-    scrollTopBtn.classList.remove('visible');
+    });
+    handleScroll();
   }
-}
 
-/* Smooth-scroll to the very top of the page */
-function scrollToTop() {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-}
-
-/* Only wire up listeners if the button exists on this page */
-if (scrollTopBtn) {
-    window.addEventListener('scroll', handleScroll);
-    scrollTopBtn.addEventListener('click', scrollToTop);
-  }
+})();
